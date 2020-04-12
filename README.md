@@ -1,2 +1,2 @@
 # buddy-car
-autonomous car using tensorflow and python
+autonomous car using deep learning and pytorch
