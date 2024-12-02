@@ -14,6 +14,10 @@ from kivy.properties import NumericProperty, ReferenceListProperty, ObjectProper
 from kivy.vector import Vector
 from kivy.clock import Clock
 
+import os
+
+os.environ["KIVY_GL_BACKEND"] = "sdl2"
+
 # Importação da IA que está no arquivo ai.py
 from ai import Dqn
 

@@ -58,7 +58,10 @@ class Dqn():
         
     def select_action(self, state):
         # sofmax(1,2,3) -> (0.04, 0.11, 0.85) -> (0, 0.02, 0.98)
-        probs = F.softmax(self.model(Variable(state, volatile = True)) * 100, dim=1) # T = 7
+        # probs = F.softmax(self.model(Variable(state, volatile = True)) * 100, dim=1) # T = 7
+        with torch.no_grad():
+            probs = F.softmax(self.model(state) * 100, dim=1)
+            
         action = probs.multinomial(1)
         return action.data[0,0]
     
@@ -69,7 +72,8 @@ class Dqn():
         td_loss = F.smooth_l1_loss(outputs, target)
         self.optimizer.zero_grad()
         # td_loss.backward(retain_variables = True)
-        td_loss.backward(retain_graph = True)
+        # td_loss.backward(retain_graph = True)
+        td_loss.backward()
         self.optimizer.step()
         
     def update(self, reward, new_signal):
