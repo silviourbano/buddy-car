@@ -13,8 +13,13 @@ from kivy.config import Config
 from kivy.properties import NumericProperty, ReferenceListProperty, ObjectProperty
 from kivy.vector import Vector
 from kivy.clock import Clock
-
 import os
+from kivy.config import Config
+
+# Define o tamanho da janela (aumente proporcionalmente)
+Config.set('graphics', 'width', '1200')  # Largura maior
+Config.set('graphics', 'height', '800')  # Altura maior
+Config.set('graphics', 'resizable', False)  # Desabilita redimensionamento manual
 
 os.environ["KIVY_GL_BACKEND"] = "sdl2"
 
@@ -103,6 +108,29 @@ class Game(Widget):
     ball1 = ObjectProperty(None) # busca o objeto sensor 1 do arquivo kivy
     ball2 = ObjectProperty(None) # busca o objeto sensor 2 do arquivo kivy
     ball3 = ObjectProperty(None) # busca o objeto sensor 3 do arquivo kivy
+    
+    def __init__(self, **kwargs):
+        super(Game, self).__init__(**kwargs)
+        global goal_x, goal_y
+
+        # Inicializa a posição do objetivo (ajustada mais tarde)
+        goal_x = 50  # Centraliza a bolinha no canto superior esquerdo
+        goal_y = 50  # Ajuste inicial (corrigido dinamicamente após inicialização)
+
+        # Adiciona o objetivo como uma bola amarela no mapa
+        with self.canvas:
+            Color(1, 1, 0)  # Define a cor amarela para o objetivo
+            self.goal_indicator = Ellipse(pos=(goal_x - 50, goal_y - 50), size=(100, 100))  # Tamanho mínimo de 100 pixels
+
+        # Ajusta a posição da bolinha após a inicialização completa da tela
+        Clock.schedule_once(self.adjust_goal_position, 0)
+
+    def adjust_goal_position(self, *args):
+        global goal_x, goal_y
+        # Calcula as coordenadas corretas para centralizar no canto superior esquerdo
+        goal_x = 50
+        goal_y = self.height - 50  # Exatamente no canto superior esquerdo
+        self.goal_indicator.pos = (goal_x - 50, goal_y - 50)  # Ajusta a posição da bolinha
 
     def serve_car(self): # inicia o carro quando executamos a aplicação
         self.car.center = self.center # posição inicial do carro no centro do maps
@@ -161,8 +189,17 @@ class Game(Widget):
 
         if distance < 100: # quando o carro chega no objetivo
             # o objetivo muda para o canto inferior direito (e vice-versa), atualizando x e y
-            goal_x = self.width-goal_x 
-            goal_y = self.height-goal_y 
+            goal_x = self.width - goal_x
+            goal_y = self.height - goal_y
+
+            # Garante que o objetivo permaneça dentro da tela
+            goal_x = max(50, min(self.width - 50, goal_x))
+            goal_y = max(50, min(self.height - 50, goal_y))
+
+            last_reward = 1  # Prêmio por alcançar o objetivo
+
+            # Atualiza a posição do objetivo visual
+            self.goal_indicator.pos = (goal_x - 50, goal_y - 50)
         
         # Atualiza a distância para o objetivo
         last_distance = distance
@@ -170,30 +207,53 @@ class Game(Widget):
 # Interface gráfica (veja https://kivy.org/docs/tutorials/firstwidget.html)
 
 class MyPaintWidget(Widget):
-
-    def on_touch_down(self, touch): # adiciona areia quando clicamos com o botão esquerdo
+    def on_touch_down(self, touch):
         global length, n_points, last_x, last_y
-        with self.canvas:
-            Color(0.8,0.7,0)
-            d = 10.
-            touch.ud['line'] = Line(points = (touch.x, touch.y), width = 10)
-            last_x = int(touch.x)
-            last_y = int(touch.y)
-            n_points = 0
-            length = 0
-            sand[int(touch.x),int(touch.y)] = 1
 
-    def on_touch_move(self, touch): # adiciona areia quando movemos o mouse enquanto pressionamos
+        # Verifica qual botão do mouse foi pressionado
+        if 'button' in touch.profile and touch.button == 'left':  # Botão esquerdo adiciona areia
+            with self.canvas:
+                Color(0.8, 0.7, 0)  # Cor da areia
+                d = 10.0
+                touch.ud['line'] = Line(points=(touch.x, touch.y), width=10)
+                last_x = int(touch.x)
+                last_y = int(touch.y)
+                n_points = 0
+                length = 0
+                sand[int(touch.x) - 10:int(touch.x) + 10, int(touch.y) - 10:int(touch.y) + 10] = 1
+
+        elif 'button' in touch.profile and touch.button == 'right':  # Botão direito apaga areia
+            with self.canvas:
+                Color(0, 0, 0)  # Cor preta para apagar
+                d = 10.0
+                touch.ud['line'] = Line(points=(touch.x, touch.y), width=10)
+                sand[int(touch.x) - 10:int(touch.x) + 10, int(touch.y) - 10:int(touch.y) + 10] = 0
+
+    def on_touch_move(self, touch):
         global length, n_points, last_x, last_y
-        if touch.button == 'left':
+
+        # Verifica qual botão do mouse está sendo usado durante o movimento
+        if 'button' in touch.profile and touch.button == 'left':  # Botão esquerdo adiciona areia
             touch.ud['line'].points += [touch.x, touch.y]
             x = int(touch.x)
             y = int(touch.y)
             length += np.sqrt(max((x - last_x)**2 + (y - last_y)**2, 2))
-            n_points += 1.
-            density = n_points/(length)
+            n_points += 1.0
+            density = n_points / (length)
             touch.ud['line'].width = int(20 * density + 1)
-            sand[int(touch.x) - 10 : int(touch.x) + 10, int(touch.y) - 10 : int(touch.y) + 10] = 1
+            sand[int(touch.x) - 10:int(touch.x) + 10, int(touch.y) - 10:int(touch.y) + 10] = 1
+            last_x = x
+            last_y = y
+
+        elif 'button' in touch.profile and touch.button == 'right':  # Botão direito apaga areia
+            touch.ud['line'].points += [touch.x, touch.y]
+            x = int(touch.x)
+            y = int(touch.y)
+            length += np.sqrt(max((x - last_x)**2 + (y - last_y)**2, 2))
+            n_points += 1.0
+            density = n_points / (length)
+            touch.ud['line'].width = int(20 * density + 1)
+            sand[int(touch.x) - 10:int(touch.x) + 10, int(touch.y) - 10:int(touch.y) + 10] = 0
             last_x = x
             last_y = y
 
